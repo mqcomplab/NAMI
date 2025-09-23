@@ -1,340 +1,189 @@
-# NAMI Chemical Space Visualizer (Readme not ready)
+# NAMI
 
-A comprehensive GUI application for molecular clustering and visualization using NAMI.
+A powerful GUI application for molecular clustering and visualization using BitBirch clustering algorithm with PCA dimensionality reduction. Provides a tool for chemists to visualize and analyze large chemical libraries.
 
-Refer to the paper: 
+## Features
 
-![Python](https://img.shields.io/badge/python-v3.7+-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Platform](https://img.shields.io/badge/platform-windows%20%7C%20macOS%20%7C%20linux-lightgrey.svg)
+- **Interactive Visualization**: 
+  - Overview of all clusters with size-based filtering
+  - Detailed cluster exploration with molecular structure display
+  - Interactive zoom, pan, and hover functionality
+- **Data Persistence**: Save and load clustering results for later analysis
+- **Options**: 
+   - User can specify Similarity Threshold, Branching Factor, FP Radius and Bits for Morgan Fingerprints
+   - Range of cluster sizes to view by the number of molecules
 
-## 🚀 Features
+## Visuals
+<p align="center">
 
-- **Interactive Molecular Clustering**: Cluster molecules using BitBirch algorithm
-- **PCA Visualization**: 2D visualization of high-dimensional molecular fingerprints
-- **Real-time Exploration**: Click clusters to explore individual molecules
-- **Molecular Properties**: Display detailed molecular descriptors and Lipinski properties
-- **Save/Load Results**: Persist clustering results for later analysis
-- **Customizable Parameters**: Adjust clustering and fingerprint parameters
-- **Progress Tracking**: Real-time progress bars for long-running operations
+| Overview Mode | Detail Mode |
+|:-------------:|:-----------:|
+| ![Overview Mode](images/overview.png) | ![Detail Mode](images/detail.png) |
+| Shows cluster centroids containing molecules in the specified range. | Shows molecules within a cluster, allows for detailed exploration. |
 
-## 📋 Table of Contents
+</p>
 
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Usage](#usage)
-- [File Formats](#file-formats)
-- [Parameters](#parameters)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
-- [License](#license)
+## Installation
 
-## 🛠 Installation
+```bash
+gitclone repo link
+cd 
+```
+
 
 ### Prerequisites
 
 - Python 3.7 or higher
 - pip package manager
 
-### Option 1: Using pip (Recommended)
+### Method 1: Using pip (Recommended)
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/bitbirch-pca-gui.git
-cd bitbirch-pca-gui
+# Create a virtual environment (recommended)
+python -m venv bitbirch_env
+source bitbirch_env/bin/activate  # On Windows: bitbirch_env\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
 ```
 
-### Option 2: Using conda
+### Method 2: Using conda
 
 ```bash
-# Create a new conda environment
-conda create -n bitbirch python=3.8
-conda activate bitbirch
+# Create conda environment
+conda create -n bitbirch_env python=3.8
+conda activate bitbirch_env
 
-# Install RDKit via conda (recommended)
-conda install -c conda-forge rdkit
-
-# Install other dependencies
-pip install pandas numpy matplotlib scikit-learn bitbirch tqdm scipy mplcursors pillow
+# Install dependencies
+conda install pandas numpy scikit-learn matplotlib tkinter
+pip install rdkit bitbirch tqdm mplcursors pillow
 ```
 
 ### Dependencies
 
+The application requires the following Python packages:
+
 ```
 pandas>=1.3.0
 numpy>=1.21.0
-matplotlib>=3.5.0
 scikit-learn>=1.0.0
-rdkit-pypi>=2022.3.5
-bitbirch>=0.2.0
+matplotlib>=3.4.0
+rdkit>=2022.03.1
+bitbirch>=1.0.0
 tqdm>=4.62.0
-scipy>=1.7.0
-mplcursors>=0.4
-Pillow>=8.3.0
+mplcursors>=0.4.0
+pillow>=8.3.0
 ```
 
-## 🚀 Quick Start
+## Usage
 
-1. **Launch the application:**
-   ```bash
-   python main.py
-   ```
+### Starting the Application
 
-2. **Load your data:**
-   - Click "Load SMILES CSV"
-   - Select a CSV file containing SMILES strings
+```bash
+python main.py
+```
 
-3. **Run clustering:**
-   - Adjust parameters if needed
-   - Click "Process & Cluster"
+### Basic Workflow
 
-4. **Explore results:**
-   - Click on clusters in the overview plot
-   - Hover over molecules for detailed information
+1. **Load Data**: Click "Load SMILES CSV" to load your molecular dataset
+   - Supported formats: CSV files with SMILES column
+   - Optional: Include a "Name" column for molecule identifiers
 
-## 📖 Usage
+2. **Configure Parameters**:
+   - **BB Threshold**: BitBirch clustering threshold (0.0-1.0)
+   - **Branching Factor**: Maximum number of subclusters per node
+   - **FP Radius**: Morgan fingerprint radius
+   - **FP Bits**: Number of bits in fingerprint
+   - **Min/Max Large Cluster**: Size range for clusters shown in overview
 
-### Main Interface
+3. **Process & Cluster**: Click to generate fingerprints and perform clustering
 
-The application consists of several panels:
+4. **Explore Results**:
+   - **Overview**: See all clusters, click to explore details
+   - **Detail View**: Hover over molecules to see structures and properties
+   - Use mouse wheel to zoom, drag to pan
 
-- **Controls Panel**: Load data, set parameters, and control processing
-- **Data Information**: Shows dataset statistics and sample molecules
-- **Visualization**: Interactive PCA plots of clusters and molecules
-- **Clustering Results**: Detailed clustering statistics and parameters
-- **Molecule Information**: Chemical structure and properties
-- **Additional Details**: Extended molecular descriptors
+5. **Save/Load**: Save clustering results for later analysis
 
-### Workflow
+### Data Format
 
-1. **Data Loading**
-   ```
-   Load SMILES CSV → Validate Data → Display Info
-   ```
+Your CSV file should contain:
+- **Required**: `SMILES` column with valid SMILES strings
+- **Optional**: `Name` column with molecule identifiers
 
-2. **Processing**
-   ```
-   Generate Fingerprints → BitBirch Clustering → PCA Reduction → Visualization
-   ```
-
-3. **Exploration**
-   ```
-   Overview Plot → Click Clusters → Detail View → Hover Molecules → Properties
-   ```
-
-### Navigation
-
-- **🔍 Zoom**: Mouse scroll wheel
-- **📱 Pan**: Click and drag
-- **🎯 Cluster Selection**: Click on cluster centers
-- **ℹ️ Molecule Details**: Hover over points in detail view
-- **🔄 Reset View**: Reset Zoom button
-- **⬅️ Navigation**: Back to Overview button
-
-## 📄 File Formats
-
-### Input CSV Format
-
-**Option 1: Header with SMILES column**
+Example CSV format:
 ```csv
 SMILES,Name
-CCO,ethanol
-C1=CC=CC=C1,benzene
-CC(=O)O,acetic acid
-CC(C)O,isopropanol
+CCO,Ethanol
+c1ccccc1,Benzene
+CC(C)O,Isopropanol
 ```
 
-**Option 2: Space-separated (no header)**
+## File Structure
+
 ```
-CCO ethanol
-C1=CC=CC=C1 benzene
-CC(=O)O acetic_acid
-CC(C)O isopropanol
-```
-
-**Option 3: SMILES only**
-```csv
-SMILES
-CCO
-C1=CC=CC=C1
-CC(=O)O
-CC(C)O
-```
-
-### Output Format
-
-Results are saved as NumPy `.npy` files containing:
-- SMILES strings
-- Cluster assignments
-- Fingerprint matrix
-- PCA coordinates
-- Parameters used
-
-## ⚙️ Parameters
-
-### BitBirch Parameters
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| **BB Threshold** | 0.65 | Distance threshold for clustering |
-| **Branching Factor** | 50 | Maximum children per node |
-
-### Fingerprint Parameters
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| **FP Radius** | 2 | Morgan fingerprint radius |
-| **FP Bits** | 2048 | Fingerprint bit vector size |
-
-### Display Parameters
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| **Min Large Cluster** | 10 | Minimum cluster size for overview |
-| **Max Large Cluster** | 1000 | Maximum cluster size for overview |
-
-### Parameter Guidelines
-
-- **Lower threshold** → More, smaller clusters
-- **Higher threshold** → Fewer, larger clusters
-- **Higher radius** → More specific fingerprints
-- **More bits** → Higher resolution fingerprints
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-#### 1. Import Errors
-
-**Problem**: `ModuleNotFoundError: No module named 'rdkit'`
-
-**Solution**:
-```bash
-# Try conda installation
-conda install -c conda-forge rdkit
-
-# Or pip
-pip install rdkit-pypi
+bitbirch-visualizer/
+├── main.py                 # Main application entry point
+├── gui_utils.py            # GUI components and utilities
+├── data_processing.py      # Data loading, processing, and clustering
+├── data_visualization.py   # Visualization and plotting functions
+├── requirements.txt        # Python dependencies
+├── setup.py               # Automated installation script
+├── README.md              # This file
+├── INSTALL.md             # Detailed installation guide
+├── images/                # Screenshots
+│   ├── overview_mode.png
+│   └── detail_mode.png
+└── examples/              # Example datasets
+    └── sample_molecules.csv
 ```
 
-#### 2. GUI Issues
+## Algorithm Details
 
-**Problem**: GUI doesn't appear or crashes
+### BitBirch Clustering
+- Efficient clustering algorithm for binary data (molecular fingerprints)
+- Builds a tree structure for fast similarity searches
+- Parameters:
+  - **Threshold**: Maximum diameter for clusters
+  - **Branching Factor**: Tree structure parameter
 
-**Solutions**:
-```bash
-# Linux/Ubuntu
-sudo apt-get install python3-tk
+### Morgan Fingerprints
+- Circular fingerprints based on molecular connectivity
+- Parameters:
+  - **Radius**: Number of bonds to consider around each atom
+  - **NBits**: Fingerprint length (higher = more detailed)
 
-# Verify matplotlib backend
-python -c "import matplotlib; print(matplotlib.get_backend())"
-```
+### PCA Visualization
+- Reduces high-dimensional fingerprint data to 2D for visualization
+- Preserves major variance patterns in the data
+- Applied to both cluster centroids and individual molecules
 
-#### 3. Memory Issues
+## Parameters Guide
 
-**Problem**: Out of memory with large datasets
+| Parameter | Recommended Range | Description |
+|-----------|------------------|-------------|
+| BB Threshold | 0.3 - 0.8 | Lower = more clusters, Higher = fewer clusters |
+| Branching Factor | 20 - 100 | Tree structure parameter, affects performance |
+| FP Radius | 2 - 4 | Larger captures more structural context |
+| FP Bits | 1024 - 4096 | More bits = higher resolution fingerprints |
+| Min Cluster Size | 5 - 50 | Minimum size for clusters shown in overview |
+| Max Cluster Size | 100 - 10000 | Maximum size for clusters shown in overview |
 
-**Solutions**:
-- Reduce fingerprint bits (e.g., 1024 instead of 2048)
-- Process smaller subsets of data
-- Increase system virtual memory
+### Lightweight Save Mode
+The application saves essential data only:
+- SMILES strings and cluster assignments
+- PCA coordinates for visualization
+- Clustering parameters
+- Molecular names (if available)
 
-#### 4. Slow Performance
+This approach ensures fast save/load times while preserving visualization capabilities.
 
-**Problem**: Clustering takes too long
+### Interactive Features
+- **Zoom/Pan**: Mouse wheel and drag for navigation
+- **Hover Information**: See molecular structures and properties
+- **Click Navigation**: Click clusters to explore details
+- **Back Navigation**: Return to overview from detail views
 
-**Solutions**:
-- Increase BitBirch threshold
-- Reduce branching factor
-- Use smaller fingerprint radius
+## Citation
 
-### Error Messages
-
-| Error | Cause | Solution |
-|-------|-------|----------|
-| "No file loaded" | CSV file not selected | Click "Load SMILES CSV" |
-| "Invalid SMILES" | Malformed molecular structures | Check SMILES syntax |
-| "No clusters found" | Threshold too high | Lower BB threshold |
-| "Memory error" | Dataset too large | Reduce data size or parameters |
-
-## 🤝 Contributing
-
-We welcome contributions! Here's how to get started:
-
-1. **Fork the repository**
-2. **Create a feature branch**
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
-3. **Make your changes**
-4. **Add tests if applicable**
-5. **Commit your changes**
-   ```bash
-   git commit -m "Add amazing feature"
-   ```
-6. **Push to your branch**
-   ```bash
-   git push origin feature/amazing-feature
-   ```
-7. **Open a Pull Request**
-
-### Development Setup
-
-```bash
-# Clone your fork
-git clone https://github.com/your-username/bitbirch-pca-gui.git
-cd bitbirch-pca-gui
-
-# Install in development mode
-pip install -e .
-
-# Run tests (if available)
-python -m pytest tests/
-```
-
-## 📊 Example Results
-
-### Sample Dataset Results
-- **Molecules**: 1,000 compounds
-- **Clusters Found**: 23 clusters
-- **Largest Cluster**: 156 molecules
-- **Processing Time**: ~30 seconds
-
-### Typical Use Cases
-- **Drug Discovery**: Cluster compound libraries
-- **Chemical Space Analysis**: Visualize molecular diversity
-- **Lead Optimization**: Group similar structures
-- **Library Design**: Identify structural gaps
-
-## 📝 Changelog
-
-### Version 1.0.0
-- Initial release
-- BitBirch clustering implementation
-- PCA visualization
-- Interactive molecule exploration
-- Save/load functionality
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [RDKit](https://www.rdkit.org/) for molecular informatics
-- [BitBirch](https://github.com/example/bitbirch) for clustering algorithm
-- [scikit-learn](https://scikit-learn.org/) for PCA implementation
-- [matplotlib](https://matplotlib.org/) for visualization
-
-## 📧 Support
-
-- **Issues**: [GitHub Issues](https://github.com/your-username/bitbirch-pca-gui/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-username/bitbirch-pca-gui/discussions)
-- **Email**: your.email@example.com
-
----
-
-**Made with ❤️ for the molecular modeling community**
+Paper: 
