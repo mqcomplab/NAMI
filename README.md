@@ -1,4 +1,4 @@
-# NAMI
+# N-Ary Mapping Interface (NAMI)
 
 A powerful GUI application for molecular clustering and visualization using BitBirch clustering algorithm with PCA dimensionality reduction. Provides a tool for chemists to visualize and analyze large chemical libraries.
 
