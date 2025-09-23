@@ -1,0 +1,137 @@
+/* assets/style.css */
+
+/* --- Base Setup --- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+
+body {
+  margin: 0;
+  background-color: #f4f4f6;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-weight: 400;
+  color: #1c1c1e;
+  letter-spacing: 0.02em;
+  -webkit-touch-callout: none; /* Disable callout on iOS */
+  -webkit-user-select: none;   /* Disable text selection on iOS */
+  user-select: none;
+}
+
+/* --- Container --- */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* --- Card style --- */
+.card {
+  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  border-radius: 20px;
+  background-color: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.1),
+    0 8px 24px rgba(0, 0, 0, 0.08);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  will-change: transform, box-shadow, border-radius;
+  cursor: default;
+}
+
+/* --- Card Hover --- */
+.card:hover {
+  transform: translateY(-8px) scale(1.015);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.10);
+  border-radius: 24px;
+  cursor: pointer;
+  border: 1px solid rgba(0, 132, 255, 0.25);
+}
+
+/* --- Button styling --- */
+button {
+  background: linear-gradient(145deg, #e0e0e0, #ffffff);
+  border: none;
+  box-shadow: 5px 5px 10px #bebebe, -5px -5px 10px #ffffff;
+  padding: 12px 24px;
+  font-weight: 600;
+  color: #1c1c1e;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 12px;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease, color 0.3s ease;
+}
+
+button:hover {
+  background: linear-gradient(145deg, #d1d1d1, #f9f9f9);
+  box-shadow: inset 3px 3px 5px #bebebe, inset -3px -3px 5px #ffffff;
+}
+
+/* --- Inputs and selects rounded --- */
+input, select, textarea {
+  border-radius: 8px;
+  border: 1px solid #d1d1d6;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 0.3s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: #007aff;
+  outline: none;
+  box-shadow: 0 0 5px rgba(0, 122, 255, 0.5);
+}
+
+/* --- Links --- */
+a {
+  color: #007aff;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+a:hover {
+  color: #0051a8;
+  text-decoration: underline;
+}
+
+/* --- Scrollbar (webkit) --- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* --- Focus styles for accessibility --- */
+:focus-visible {
+  outline: 2px solid #007aff;
+  outline-offset: 2px;
+}
+
+/* --- Frosted glass style (optional use) --- */
+.frosted {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+}
+
+/* --- Image styling (for molecule imgs) --- */
+img {
+  border-radius: 14px;
+  box-shadow:
+    0 4px 12px rgba(0,0,0,0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+img:hover {
+  transform: scale(1.05);
+  box-shadow:
+    0 12px 28px rgba(0,0,0,0.15);
+}
