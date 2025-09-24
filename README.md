@@ -26,7 +26,7 @@ A powerful GUI application for molecular clustering and visualization using BitB
 ## Installation
 
 ```bash
-gitclone repo link
+gitclone https://github.com/mqcomplab/NAMI.git
 cd NAMI
 ```
 
