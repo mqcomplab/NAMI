@@ -16,7 +16,7 @@ import mplcursors
 from PIL import Image, ImageTk
 import io
 from gui_utils import GUIComponents
-from data_processing import Data_Processing
+from data_processing_alt import Data_Processing
 from data_visualization import Data_Visualization
 
 class BitBirchPCAGUI:
