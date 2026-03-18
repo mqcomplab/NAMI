@@ -16,7 +16,7 @@ import mplcursors
 from PIL import Image, ImageTk
 import io
 from gui_utils import GUIComponents
-from data_processing import Data_Processing
+from data_processing_alt import Data_Processing
 from data_visualization import Data_Visualization
 
 class BitBirchPCAGUI:
@@ -34,12 +34,19 @@ class BitBirchPCAGUI:
         self.zoom_pan = None
         
         # Parameter variables
-        self.threshold_var = tk.StringVar(value="0.65")
+        self.threshold_var = tk.StringVar(value="0.25")
         self.branching_var = tk.StringVar(value="50")
         self.radius_var = tk.StringVar(value="2")
         self.nbits_var = tk.StringVar(value="1024")
         self.min_cluster_size_var = tk.StringVar(value="10")
         self.max_cluster_size_var = tk.StringVar(value="1000")
+        # Option to hide singleton clusters from overview
+        self.hide_singletons_var = tk.BooleanVar(value=True)
+        # Parallel clustering for large datasets (auto-enabled for >1M molecules)
+        self.use_parallel_clustering_var = tk.BooleanVar(value=False)
+        self.parallel_num_processes_var = tk.StringVar(value="10")
+        # Incremental PCA for memory-efficient full molecule PCA
+        self.use_incremental_pca_var = tk.BooleanVar(value=False)
 
         # Initialize components
         self.gui = GUIComponents(self)
@@ -48,6 +55,14 @@ class BitBirchPCAGUI:
         
         # Create the GUI
         self.gui.create_widgets()
+        
+        # Set up window close handler
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+    
+    def on_closing(self):
+        """Clean up before closing the window"""
+        self.gui.memory_update_active = False  # Stop memory monitoring
+        self.root.destroy()
         
     # Delegate methods to appropriate components
     def load_smiles_file(self):

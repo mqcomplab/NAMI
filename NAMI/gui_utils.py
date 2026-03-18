@@ -8,6 +8,8 @@ from rdkit import Chem
 from rdkit.Chem import AllChem, Draw, rdMolDescriptors
 from PIL import Image, ImageTk
 import io
+import psutil
+import os
 
 class ZoomPan:
     def __init__(self, canvas, ax):
@@ -50,6 +52,9 @@ class ZoomPan:
 class GUIComponents:
     def __init__(self, parent_app):
         self.app = parent_app
+        self.process = psutil.Process(os.getpid())
+        self.peak_memory_mb = 0
+        self.memory_update_active = False
 
     def create_widgets(self):
         main_frame = ttk.Frame(self.app.root, padding="10")
@@ -84,7 +89,24 @@ class GUIComponents:
             ttk.Label(ctrl, text=label).grid(row=2, column=i*2, padx=(0, 5), pady=(5, 0))
             ttk.Entry(ctrl, textvariable=var, width=8).grid(row=2, column=i*2+1, padx=(0, 10), pady=(5, 0))
         
-        # Row 3: Action buttons
+        # Hide singletons checkbox (affects both display and PCA memory usage)
+        self.hide_singletons_check = ttk.Checkbutton(ctrl, text="Hide singletons (saves memory)", variable=self.app.hide_singletons_var, 
+                                                      command=self.app.show_overview)
+        self.hide_singletons_check.grid(row=2, column=2, columnspan=2, padx=(10, 0), pady=(5, 0), sticky="w")
+        
+        # Parallel clustering checkbox (for large datasets)
+        self.parallel_check = ttk.Checkbutton(ctrl, text="Parallel clustering (>1M mols)", 
+                                              variable=self.app.use_parallel_clustering_var)
+        self.parallel_check.grid(row=2, column=4, padx=(10, 5), pady=(5, 0), sticky="w")
+        ttk.Label(ctrl, text="#Procs:").grid(row=2, column=5, padx=(0, 5), pady=(5, 0))
+        ttk.Entry(ctrl, textvariable=self.app.parallel_num_processes_var, width=5).grid(row=2, column=6, padx=(0, 10), pady=(5, 0))
+        
+        # Row 3: Advanced options
+        self.incremental_pca_check = ttk.Checkbutton(ctrl, text="Compute full PCA (incremental, memory-efficient)", 
+                                                      variable=self.app.use_incremental_pca_var)
+        self.incremental_pca_check.grid(row=3, column=0, columnspan=3, padx=(0, 10), pady=(5, 0), sticky="w")
+        
+        # Row 4: Action buttons
         self.process_btn = ttk.Button(ctrl, text="Process & Cluster", command=self.app.start_processing, state="disabled")
         self.save_btn = ttk.Button(ctrl, text="Save Results", command=self.app.save_results, state="disabled")
         self.load_btn = ttk.Button(ctrl, text="Load Results", command=self.app.load_results)
@@ -93,11 +115,11 @@ class GUIComponents:
         self.reset_zoom_btn = ttk.Button(ctrl, text="Reset Zoom", command=self.reset_zoom, state="disabled")
 
         for i, btn in enumerate([self.process_btn, self.save_btn, self.load_btn, self.back_btn, self.refresh_btn, self.reset_zoom_btn]):
-            btn.grid(row=3, column=i, padx=(0, 10), pady=(5, 0))
+            btn.grid(row=4, column=i, padx=(0, 10), pady=(5, 0))
         
         # Progress bar
         self.progress = ttk.Progressbar(ctrl, mode='indeterminate')
-        self.progress.grid(row=4, column=0, columnspan=6, sticky="ew", pady=(10, 0))
+        self.progress.grid(row=5, column=0, columnspan=6, sticky="ew", pady=(10, 0))
         
         # Create text widgets with scrollbars
         for i, (title, attr) in enumerate([("Data Information", "info_text"), ("Clustering Results", "results_text")]):
@@ -133,16 +155,34 @@ class GUIComponents:
         mol_frame = ttk.LabelFrame(main_frame, text="Molecule Information", padding="5")
         mol_frame.grid(row=1, column=2, sticky="nsew")
         mol_frame.grid_columnconfigure(0, weight=1)
-        mol_frame.grid_rowconfigure(1, weight=1)
+        mol_frame.grid_rowconfigure(2, weight=1)  # Row 2 is the scrollable text area
         
         self.mol_canvas = tk.Canvas(mol_frame, width=200, height=200, bg='white')
         self.mol_canvas.grid(row=0, column=0, sticky="ew", pady=(0, 10))
         
+        # Navigation controls for multiple molecules at same point
+        nav_frame = ttk.Frame(mol_frame)
+        nav_frame.grid(row=1, column=0, sticky="ew", pady=(0, 5))
+        
+        self.prev_mol_btn = ttk.Button(nav_frame, text="◀ Previous", command=self.show_prev_molecule, state="disabled")
+        self.prev_mol_btn.pack(side=tk.LEFT, padx=2)
+        
+        self.mol_counter_label = ttk.Label(nav_frame, text="", font=('Arial', 9))
+        self.mol_counter_label.pack(side=tk.LEFT, padx=10, expand=True)
+        
+        self.next_mol_btn = ttk.Button(nav_frame, text="Next ▶", command=self.show_next_molecule, state="disabled")
+        self.next_mol_btn.pack(side=tk.RIGHT, padx=2)
+        
         self.mol_text = tk.Text(mol_frame, height=8, width=30, wrap=tk.WORD)
         mol_scrollbar = ttk.Scrollbar(mol_frame, orient="vertical", command=self.mol_text.yview)
         self.mol_text.configure(yscrollcommand=mol_scrollbar.set)
-        self.mol_text.grid(row=1, column=0, sticky="nsew")
-        mol_scrollbar.grid(row=1, column=1, sticky="ns")
+        self.mol_text.grid(row=2, column=0, sticky="nsew")
+        mol_scrollbar.grid(row=2, column=1, sticky="ns")
+        
+        # Initialize state for multiple molecules
+        self.current_mol_list = []
+        self.current_mol_index = 0
+        self.current_cluster_df = None
         
         # Additional details frame
         add_frame = ttk.LabelFrame(main_frame, text="Additional Details", padding="5")
@@ -155,7 +195,18 @@ class GUIComponents:
         self.additional_text.grid(row=0, column=0, sticky="nsew")
         add_scrollbar.grid(row=0, column=1, sticky="ns")
         
+        # Memory monitor at bottom right
+        memory_frame = ttk.Frame(add_frame)
+        memory_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(5, 0))
+        self.memory_label = ttk.Label(memory_frame, text="Memory: 0 MB | Peak: 0 MB", 
+                                      font=('Arial', 8), foreground='#666')
+        self.memory_label.pack(anchor='e', padx=5)
+        
         self.clear_molecule_info()
+        
+        # Start memory monitoring
+        self.memory_update_active = True
+        self.update_memory_display()
 
     def setup_zoom_pan(self, ax):
         self.zoom_pan = ZoomPan(self.canvas, ax)
@@ -167,12 +218,20 @@ class GUIComponents:
     
     def clear_molecule_info(self):
         self.mol_canvas.delete("all")
-        self.mol_canvas.create_text(100, 100, text="Hover over a molecule\nto see details", 
+        self.mol_canvas.create_text(100, 100, text="Click a molecule\nto see details", 
                                    fill="gray", font=("Arial", 12), justify="center")
         self.mol_text.delete(1.0, tk.END)
-        self.mol_text.insert(tk.END, "No molecule selected.\n\nHover over molecules in the detail view to see their information here.")
+        self.mol_text.insert(tk.END, "No molecule selected.\n\nClick molecules in the detail view to see their information here.")
         self.additional_text.delete(1.0, tk.END)
         self.additional_text.insert(tk.END, "Additional molecule properties and cluster statistics will appear here when available.")
+        
+        # Reset navigation
+        self.current_mol_list = []
+        self.current_mol_index = 0
+        self.current_cluster_df = None
+        self.prev_mol_btn.config(state="disabled")
+        self.next_mol_btn.config(state="disabled")
+        self.mol_counter_label.config(text="")
     
     def display_molecule_info(self, mol_index, mol, smiles, cluster_df):
         self.mol_canvas.delete("all")
@@ -218,7 +277,117 @@ class GUIComponents:
         # Additional info
         add_info = ["Cluster Statistics:"]
         if hasattr(self.app, 'selected_cluster') and self.app.selected_cluster is not None:
-            add_info.extend([f"Cluster ID: {self.app.selected_cluster}", f"Cluster Size: {len(cluster_df)}"])
+            add_info.extend([f"Cluster ID: {int(self.app.selected_cluster)}", f"Cluster Size: {len(cluster_df)}"])
+        
+        self.additional_text.insert(tk.END, "\n".join(add_info))
+
+    def display_multiple_molecules(self, mol_indices, cluster_df):
+        """Display multiple molecules at the same point with navigation"""
+        if not mol_indices:
+            return
+            
+        self.current_mol_list = mol_indices
+        self.current_mol_index = 0
+        self.current_cluster_df = cluster_df
+        
+        # Enable/disable navigation buttons
+        if len(mol_indices) > 1:
+            self.next_mol_btn.config(state="normal")
+            self.prev_mol_btn.config(state="disabled" if self.current_mol_index == 0 else "normal")
+            self.mol_counter_label.config(text=f"Molecule 1 of {len(mol_indices)}")
+        else:
+            self.next_mol_btn.config(state="disabled")
+            self.prev_mol_btn.config(state="disabled")
+            self.mol_counter_label.config(text="1 molecule")
+        
+        # Display first molecule
+        mol_idx = mol_indices[0]
+        from rdkit import Chem
+        mol = cluster_df.iloc[mol_idx]['mol']
+        smiles = cluster_df.iloc[mol_idx]['SMILES']
+        self.display_molecule_info(mol_idx, mol, smiles, cluster_df)
+        
+        # Update additional info using helper function
+        self._update_additional_info_for_navigation()
+    
+    def show_next_molecule(self):
+        """Show next molecule in the current list"""
+        if not self.current_mol_list or self.current_mol_index >= len(self.current_mol_list) - 1:
+            return
+        
+        self.current_mol_index += 1
+        mol_idx = self.current_mol_list[self.current_mol_index]
+        
+        from rdkit import Chem
+        mol = self.current_cluster_df.iloc[mol_idx]['mol']
+        smiles = self.current_cluster_df.iloc[mol_idx]['SMILES']
+        self.display_molecule_info(mol_idx, mol, smiles, self.current_cluster_df)
+        
+        # Update counter and buttons
+        self.mol_counter_label.config(text=f"Molecule {self.current_mol_index + 1} of {len(self.current_mol_list)}")
+        self.prev_mol_btn.config(state="normal")
+        if self.current_mol_index >= len(self.current_mol_list) - 1:
+            self.next_mol_btn.config(state="disabled")
+        
+        # Update additional info to highlight current molecule
+        self._update_additional_info_for_navigation()
+    
+    def show_prev_molecule(self):
+        """Show previous molecule in the current list"""
+        if not self.current_mol_list or self.current_mol_index <= 0:
+            return
+        
+        self.current_mol_index -= 1
+        mol_idx = self.current_mol_list[self.current_mol_index]
+        
+        from rdkit import Chem
+        mol = self.current_cluster_df.iloc[mol_idx]['mol']
+        smiles = self.current_cluster_df.iloc[mol_idx]['SMILES']
+        self.display_molecule_info(mol_idx, mol, smiles, self.current_cluster_df)
+        
+        # Update counter and buttons
+        self.mol_counter_label.config(text=f"Molecule {self.current_mol_index + 1} of {len(self.current_mol_list)}")
+        self.next_mol_btn.config(state="normal")
+        if self.current_mol_index <= 0:
+            self.prev_mol_btn.config(state="disabled")
+        
+        # Update additional info to highlight current molecule
+        self._update_additional_info_for_navigation()
+    
+    def _update_additional_info_for_navigation(self):
+        """Update the additional info panel to highlight the current molecule"""
+        if not self.current_mol_list or not self.current_cluster_df is not None:
+            return
+        
+        self.additional_text.delete(1.0, tk.END)
+        add_info = ["Cluster Statistics:"]
+        if hasattr(self.app, 'selected_cluster') and self.app.selected_cluster is not None:
+            add_info.extend([f"Cluster ID: {int(self.app.selected_cluster)}", 
+                           f"Cluster Size: {len(self.current_cluster_df)}"])
+        
+        if len(self.current_mol_list) > 1:
+            add_info.extend([f"\n{'='*30}",
+                           f"MOLECULES AT THIS POINT: {len(self.current_mol_list)}",
+                           f"{'='*30}",
+                           f"\nThese molecules have identical",
+                           f"or very similar fingerprints.\n"])
+            
+            # List all molecules at this point, highlighting the current one
+            for i, idx in enumerate(self.current_mol_list):
+                mol_data = self.current_cluster_df.iloc[idx]
+                name = mol_data.get('Name', f'Mol_{idx}')
+                smiles_short = mol_data['SMILES'][:50] + '...' if len(mol_data['SMILES']) > 50 else mol_data['SMILES']
+                
+                # Highlight current molecule
+                if i == self.current_mol_index:
+                    add_info.append(f"▶ {i+1}. {name} ◀ VIEWING")
+                else:
+                    add_info.append(f"{i+1}. {name}")
+                add_info.append(f"   {smiles_short}")
+            
+            add_info.append(f"\nUse ◀▶ buttons to navigate")
+        else:
+            add_info.append(f"\nSingle molecule at this point")
         
         self.additional_text.insert(tk.END, "\n".join(add_info))
 
@@ -228,6 +397,40 @@ class GUIComponents:
         elif self.app.current_view == 'cluster' and self.app.selected_cluster is not None:
             self.app.visualizer.show_cluster_detail(self.app.selected_cluster)
         self.app.visualizer.display_clustering_results()
+    
+    def update_memory_display(self):
+        """Update memory usage display every 2 seconds"""
+        if not self.memory_update_active:
+            return
+        
+        try:
+            # Get current memory usage in MB
+            current_memory_mb = self.process.memory_info().rss / (1024 * 1024)
+            
+            # Track peak memory
+            if current_memory_mb > self.peak_memory_mb:
+                self.peak_memory_mb = current_memory_mb
+            
+            # Update label
+            self.memory_label.config(
+                text=f"Memory: {current_memory_mb:.0f} MB | Peak: {self.peak_memory_mb:.0f} MB"
+            )
+            
+            # Color coding based on usage
+            if current_memory_mb < 1000:
+                color = '#2ecc71'  # Green
+            elif current_memory_mb < 5000:
+                color = '#f39c12'  # Orange
+            else:
+                color = '#e74c3c'  # Red
+            self.memory_label.config(foreground=color)
+            
+        except Exception:
+            pass
+        
+        # Schedule next update (2 seconds)
+        if self.memory_update_active:
+            self.app.root.after(2000, self.update_memory_display)
 
     def display_data_info(self):
         if self.app.data is None: 
