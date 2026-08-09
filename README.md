@@ -26,21 +26,17 @@ A powerful GUI application for molecular clustering and visualization using BitB
 ## Installation
 
 ```bash
-gitclone https://github.com/mqcomplab/NAMI.git
+git clone https://github.com/mqcomplab/NAMI.git
 cd NAMI
 ```
 
-
-### Creating venv
 ```bash
-# Create a virtual environment (recommended)
-python -m venv NAMI_env
-source NAMI_env/bin/activate  # On Windows: NAMI_env\Scripts\activate
-
-# Install dependencies
-pip install tkinter pandas numpy scikit-learn rdkit matplotlib tqdm scipy mplcursors pillow
+conda create -n nami-env python=3.11
+conda activate nami-env
+BITBIRCH_BUILD_CPP=1 pip install -e .
 ```
-Instructions for installation of BitBIRCH at: https://github.com/mqcomplab/bitbirch.
+
+This installs the project in editable mode and pulls in the required bblean dependency from the GitHub repository.
 
 
 ## Usage
