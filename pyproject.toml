@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nami"
+version = "0.1.0"
+description = "NAMI molecular clustering and visualization toolkit"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "scipy",
+    "scikit-learn",
+    "rdkit",
+    "mplcursors",
+    "Pillow",
+    "psutil",
+    "tqdm",
+    "seaborn",
+    "colorcet",
+    "rich",
+    "typing-extensions",
+    "umap-learn",
+    "openTSNE",
+    "bblean @ git+https://github.com/mqcomplab/bblean.git",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["NAMI*"]
