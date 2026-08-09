@@ -1,11 +1,19 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import filedialog, messagebox
+from collections import Counter
 import pandas as pd
 import numpy as np
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from scipy.stats import gaussian_kde
 import mplcursors
+from rdkit import Chem
+from rdkit.Chem import Draw
+from rdkit.Chem.Scaffolds import MurckoScaffold
+
+from bblean.analysis import cluster_analysis
+from bblean.plotting import summary_plot
 
 class Data_Visualization:
     def __init__(self, parent_app):
@@ -68,6 +76,232 @@ class Data_Visualization:
         self.app.gui.setup_zoom_pan(ax)
         self.app.gui.fig.tight_layout()
         self.app.gui.canvas.draw()
+
+    def show_summary_plot(self):
+        if self.app.data is None or self.app.cluster_assignments is None:
+            messagebox.showwarning(
+                "Warning",
+                "Load and cluster data before creating the summary plot."
+            )
+            return
+
+        if self.app.X is None:
+            messagebox.showwarning(
+                "Warning",
+                "Fingerprint data is not available, so the summary plot cannot be built."
+            )
+            return
+
+        valid_assignments = self.app.cluster_assignments[self.app.cluster_assignments >= 0]
+        if valid_assignments.size == 0:
+            messagebox.showinfo("Info", "No valid clusters found to plot.")
+            return
+
+        cluster_sizes = np.bincount(valid_assignments)
+        top_20_ids = np.argsort(cluster_sizes)[-min(20, len(cluster_sizes)):][::-1]
+        top_20_ids = [int(cid) for cid in top_20_ids.tolist() if cluster_sizes[cid] > 0]
+
+        if len(cluster_sizes) < 100_000:
+            analysis_clusters = [
+                np.where(self.app.cluster_assignments == cid)[0].tolist()
+                for cid in range(len(cluster_sizes))
+                if cluster_sizes[cid] > 0
+            ]
+            analysis_assume_sorted = True
+            analysis_top = None
+        else:
+            analysis_clusters = [
+                np.where(self.app.cluster_assignments == cid)[0].tolist()
+                for cid in top_20_ids
+            ]
+            analysis_assume_sorted = True
+            analysis_top = None
+
+        try:
+            nbits = int(self.app.nbits_var.get())
+        except ValueError:
+            nbits = 1024
+
+        analysis = cluster_analysis(
+            analysis_clusters,
+            self.app.X,
+            smiles=self.app.data['SMILES'].tolist(),
+            n_features=nbits,
+            top=analysis_top,
+            assume_sorted=analysis_assume_sorted,
+            input_is_packed=True,
+            min_size=1,
+        )
+
+        if analysis.df.empty:
+            messagebox.showinfo("Info", "No clusters were available for the top-20 summary plot.")
+            return
+
+        fig, _ = summary_plot(analysis, title="Top 20 clusters")
+
+        window = tk.Toplevel(self.app.root)
+        window.title("Top 20 Cluster Summary Plot")
+        window.geometry("900x600")
+
+        canvas = FigureCanvasTkAgg(fig, master=window)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+        toolbar_frame = tk.Frame(window)
+        toolbar_frame.pack(fill=tk.X)
+        NavigationToolbar2Tk(canvas, toolbar_frame)
+
+        controls_frame = tk.Frame(window)
+        controls_frame.pack(fill=tk.X, pady=(6, 4))
+
+        tk.Label(controls_frame, text="Cluster for Scaffold Images (Top 20):").pack(side=tk.LEFT, padx=(8, 6))
+        self.app.summary_scaffold_cluster_var = tk.StringVar(value=str(top_20_ids[0]))
+        cluster_menu = tk.OptionMenu(
+            controls_frame,
+            self.app.summary_scaffold_cluster_var,
+            *[str(cid) for cid in top_20_ids],
+        )
+        cluster_menu.pack(side=tk.LEFT)
+
+        scaffold_btn = tk.Button(
+            controls_frame,
+            text="Generate Top 5 Scaffolds",
+            command=lambda: self.generate_top_scaffold_plot(
+                int(self.app.summary_scaffold_cluster_var.get())
+            ),
+        )
+        scaffold_btn.pack(side=tk.LEFT, padx=(10, 0))
+
+        save_btn = tk.Button(
+            window,
+            text="Save 600 DPI Image",
+            command=lambda: self.save_summary_plot_image(fig),
+        )
+        save_btn.pack(pady=(0, 8))
+
+        def _close_window():
+            plt.close(fig)
+            window.destroy()
+
+        window.protocol("WM_DELETE_WINDOW", _close_window)
+
+        self.app.summary_plot_window = window
+        self.app.summary_plot_canvas = canvas
+        self.app.summary_plot_figure = fig
+
+    def generate_top_scaffold_plot(self, cluster_id):
+        cluster_mask = self.app.cluster_assignments == cluster_id
+        cluster_smiles = self.app.data.loc[cluster_mask, 'SMILES'].tolist()
+
+        if not cluster_smiles:
+            messagebox.showinfo("Info", f"Cluster {cluster_id} has no molecules.")
+            return
+
+        scaffold_counter = Counter()
+        for smi in cluster_smiles:
+            try:
+                scaf_smi = MurckoScaffold.MurckoScaffoldSmilesFromSmiles(smi)
+            except Exception:
+                scaf_smi = ""
+            if scaf_smi:
+                scaffold_counter[scaf_smi] += 1
+
+        if not scaffold_counter:
+            messagebox.showinfo("Info", f"No valid scaffolds found for cluster {cluster_id}.")
+            return
+
+        top_scaffolds = scaffold_counter.most_common(5)
+        mols = []
+        legends = []
+        for scaf_smi, count in top_scaffolds:
+            mol = Chem.MolFromSmiles(scaf_smi)
+            if mol is not None:
+                mols.append(mol)
+                legends.append(f"Count: {count}")
+
+        if not mols:
+            messagebox.showinfo("Info", f"Unable to render scaffold molecules for cluster {cluster_id}.")
+            return
+
+        grid_img = Draw.MolsToGridImage(
+            mols,
+            molsPerRow=min(5, len(mols)),
+            subImgSize=(320, 320),
+            legends=legends,
+        )
+
+        fig, ax = plt.subplots(figsize=(14, 4), dpi=150)
+        ax.imshow(np.asarray(grid_img))
+        ax.axis("off")
+        ax.set_title(f"Cluster {cluster_id}: Top 5 Most Frequent Scaffolds", fontsize=12, pad=12)
+        fig.tight_layout()
+
+        window = tk.Toplevel(self.app.root)
+        window.title(f"Top 5 Scaffolds - Cluster {cluster_id}")
+        window.geometry("1200x520")
+
+        canvas = FigureCanvasTkAgg(fig, master=window)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+        toolbar_frame = tk.Frame(window)
+        toolbar_frame.pack(fill=tk.X)
+        NavigationToolbar2Tk(canvas, toolbar_frame)
+
+        save_btn = tk.Button(
+            window,
+            text="Save Scaffold Image (600 DPI PNG)",
+            command=lambda: self.save_scaffold_plot_image(fig),
+        )
+        save_btn.pack(pady=(0, 8))
+
+        def _close_window():
+            plt.close(fig)
+            window.destroy()
+
+        window.protocol("WM_DELETE_WINDOW", _close_window)
+
+        self.app.scaffold_plot_window = window
+        self.app.scaffold_plot_canvas = canvas
+        self.app.scaffold_plot_figure = fig
+
+    def save_summary_plot_image(self, fig):
+        file_path = filedialog.asksaveasfilename(
+            title="Save Summary Plot",
+            defaultextension=".png",
+            filetypes=[
+                ("PNG Image", "*.png"),
+                ("PDF File", "*.pdf"),
+                ("SVG File", "*.svg"),
+                ("All files", "*.*"),
+            ],
+        )
+        if not file_path:
+            return
+
+        try:
+            fig.savefig(file_path, dpi=600, bbox_inches="tight")
+            messagebox.showinfo("Success", f"Saved image to:\n{file_path}")
+        except Exception as exc:
+            messagebox.showerror("Error", f"Failed to save image:\n{exc}")
+
+    def save_scaffold_plot_image(self, fig):
+        file_path = filedialog.asksaveasfilename(
+            title="Save Scaffold Plot",
+            defaultextension=".png",
+            filetypes=[
+                ("PNG Image", "*.png"),
+                ("All files", "*.*"),
+            ],
+        )
+        if not file_path:
+            return
+
+        try:
+            fig.savefig(file_path, dpi=600, bbox_inches="tight")
+            messagebox.showinfo("Success", f"Saved scaffold image to:\n{file_path}")
+        except Exception as exc:
+            messagebox.showerror("Error", f"Failed to save scaffold image:\n{exc}")
     
     def show_cluster_detail(self, cluster_id):
         if self.app.data is None: 
