@@ -230,7 +230,7 @@ class Data_Visualization:
             legends=legends,
         )
 
-        fig, ax = plt.subplots(figsize=(14, 4), dpi=150)
+        fig, ax = plt.subplots(figsize=(14, 4), dpi=600)
         ax.imshow(np.asarray(grid_img))
         ax.axis("off")
         ax.set_title(f"Cluster {cluster_id}: Top 5 Most Frequent Scaffolds", fontsize=12, pad=12)

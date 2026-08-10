@@ -178,6 +178,28 @@ def _parallel_compute_centroids(X_packed, cluster_ids, cluster_to_indices, nbits
     return np.array(centroids_out, dtype=np.uint8), ids_out
 
 
+def _serial_compute_centroids(X_packed, cluster_ids, cluster_to_indices, nbits):
+    """Compute centroids for cluster_ids in a single process."""
+    ids_out, centroids_out = [], []
+
+    for cid in cluster_ids:
+        indices = cluster_to_indices.get(cid)
+        if indices is None or len(indices) == 0:
+            continue
+
+        cluster_packed = X_packed[indices]
+        cluster_unpacked = unpack_fingerprints(cluster_packed, n_features=nbits)
+        linear_sum = np.sum(cluster_unpacked, axis=0, dtype=np.uint64)
+        centroid = centroid_from_sum(linear_sum, len(cluster_unpacked), pack=False)
+        ids_out.append(cid)
+        centroids_out.append(centroid)
+
+    if not centroids_out:
+        return np.empty((0, nbits), dtype=np.uint8), []
+
+    return np.array(centroids_out, dtype=np.uint8), ids_out
+
+
 # ---------------------------------------------------------------------------
 # Main class
 # ---------------------------------------------------------------------------
@@ -465,36 +487,48 @@ class Data_Processing:
 
             smiles_list = self.app.data['SMILES'].tolist()
             n_samples = len(smiles_list)
-            n_cores = max(1, _available_cores() - 1)
-
-            # Adaptive batch size: ≥4 batches/core, capped at 1000
-            batch_size = min(1000, max(100,
-                             n_samples // (n_cores * 4)))
-
-            # FIX 2: each batch is processed as a whole by fps_from_smiles
-            batches = [
-                (i, smiles_list[i * batch_size:(i + 1) * batch_size])
-                for i in range((n_samples + batch_size - 1) // batch_size)
-            ]
-            self._log(f"  {n_cores} cores, {len(batches)} batches "
-                       f"(size={batch_size}), kind={fp_kind}")
-
-            worker = partial(_process_smiles_batch,
-                             fp_kind=fp_kind, nbits=nbits)
-            chunksize = max(1, len(batches) // (n_cores * 2))
-
             fps_list = []
             valid_indices = []
 
-            with Pool(n_cores) as pool:
-                for fps, b_idx, local_valid in pool.imap(
-                        worker, batches, chunksize=chunksize):
-                    if len(fps) > 0:
-                        fps_list.append(fps)
-                        start = b_idx * batch_size
-                        valid_indices.extend(start + li for li in local_valid)
-                    pct = int((b_idx + 1) / len(batches) * 60)
-                    self._set_progress(pct)
+            if n_samples < 100_000:
+                self._log(f"  Serial mode (<100k): kind={fp_kind}")
+                fps, _, local_valid = _process_smiles_batch(
+                    (0, smiles_list),
+                    fp_kind=fp_kind,
+                    nbits=nbits,
+                )
+                if len(fps) > 0:
+                    fps_list.append(fps)
+                    valid_indices.extend(local_valid)
+                self._set_progress(60)
+            else:
+                n_cores = max(1, _available_cores() - 1)
+
+                # Adaptive batch size: ≥4 batches/core, capped at 1000
+                batch_size = min(1000, max(100,
+                                 n_samples // (n_cores * 4)))
+
+                # FIX 2: each batch is processed as a whole by fps_from_smiles
+                batches = [
+                    (i, smiles_list[i * batch_size:(i + 1) * batch_size])
+                    for i in range((n_samples + batch_size - 1) // batch_size)
+                ]
+                self._log(f"  Parallel mode: {n_cores} cores, {len(batches)} batches "
+                           f"(size={batch_size}), kind={fp_kind}")
+
+                worker = partial(_process_smiles_batch,
+                                 fp_kind=fp_kind, nbits=nbits)
+                chunksize = max(1, len(batches) // (n_cores * 2))
+
+                with Pool(n_cores) as pool:
+                    for fps, b_idx, local_valid in pool.imap(
+                            worker, batches, chunksize=chunksize):
+                        if len(fps) > 0:
+                            fps_list.append(fps)
+                            start = b_idx * batch_size
+                            valid_indices.extend(start + li for li in local_valid)
+                        pct = int((b_idx + 1) / len(batches) * 60)
+                        self._set_progress(pct)
 
             if not fps_list:
                 raise ValueError("No valid fingerprints generated")
@@ -734,10 +768,16 @@ class Data_Processing:
 
         # Fallback: compute centroids from fingerprints
         if centroids_array is None:
-            self._log(f"  Computing centroids for {len(target_ids):,} "
-                       f"clusters (parallel)...")
-            centroids_array, actual_ids = _parallel_compute_centroids(
-                self.app.X, target_ids, cluster_to_indices, nbits)
+            if len(self.app.X) < 100_000:
+                self._log(f"  Computing centroids for {len(target_ids):,} "
+                           f"clusters (serial, <100k)...")
+                centroids_array, actual_ids = _serial_compute_centroids(
+                    self.app.X, target_ids, cluster_to_indices, nbits)
+            else:
+                self._log(f"  Computing centroids for {len(target_ids):,} "
+                           f"clusters (parallel)...")
+                centroids_array, actual_ids = _parallel_compute_centroids(
+                    self.app.X, target_ids, cluster_to_indices, nbits)
 
         if len(centroids_array) < 2:
             self.app.centroid_pca = pd.DataFrame(
