@@ -8,7 +8,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from matplotlib.figure import Figure
 from rdkit import Chem
 from rdkit.Chem import AllChem, Draw, rdMolDescriptors
-import bitbirch.bitbirch as bb
+import bblean.bitbirch as bb
 from tqdm.auto import tqdm
 import threading
 from scipy.stats import gaussian_kde
