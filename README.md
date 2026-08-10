@@ -43,29 +43,40 @@ This installs the project in editable mode and pulls in the required bblean depe
 
 ### Starting the Application
 
+From the repository root, start the GUI with:
+
 ```bash
 python NAMI/main.py
 ```
+
 ### Basic Workflow
 
-1. **Load Data**: Click "Load SMILES CSV" to load your molecular dataset
-   - Supported formats: CSV files with SMILES column
+1. **Load a SMILES dataset**
+   - Click "Load SMILES CSV" and select your input file.
+   - The loader accepts CSV files with a SMILES column, single-column SMILES lists, or two-column SMILES/Name files.
 
-2. **Configure Parameters**:
-   - **BB Threshold**: BitBirch clustering threshold (0.0-1.0)
-   - **Branching Factor**: Maximum number of subclusters per node
-   - **FP Radius**: Morgan fingerprint radius
-   - **FP Bits**: Number of bits in fingerprint
-   - **Min/Max Large Cluster**: Size range for clusters shown in overview
+2. **Configure clustering parameters**
+   - **BB Threshold**: BitBirch similarity cutoff.
+   - **Branching Factor**: Maximum number of subclusters per node.
+   - **FP Radius** and **FP Bits**: Morgan fingerprint settings.
+   - **Min Large Cluster** and **Max Large Cluster**: Filter which cluster sizes appear in the overview.
+   - Optional toggles include:
+     - **Hide singletons** to reduce memory usage and clutter.
+     - **Parallel clustering** for very large datasets.
 
-3. **Process & Cluster**: Click to generate fingerprints and perform clustering
+3. **Process and cluster**
+   - Click "Process & Cluster" to generate fingerprints, run BitBirch clustering, and compute the PCA-based layout.
+   - For very large libraries, enable parallel clustering and set the number of worker processes.
 
-4. **Explore Results**:
-   - **Overview**: See all clusters, click to explore details
-   - **Detail View**: Hover over molecules to see structures and properties
-   - Use mouse wheel to zoom, drag to pan
+4. **Explore the results**
+   - **Overview mode** shows the cluster centroids; click a point to jump to the matching cluster.
+   - **Detail view** shows the molecules belonging to the selected cluster, along with structure and property information.
+   - Use the mouse wheel to zoom, drag to pan, and use the navigation buttons to return to the overview or reset the view.
+   - Review the generated analysis summaries for the **top 20 clusters** and the **top 5 scaffolds** to quickly identify the most prominent groups in the dataset.
 
-5. **Save/Load**: Save clustering results for later analysis
+5. **Save or reload analyses**
+   - Use "Save Results" to export the current clustering layout and metadata.
+   - Use "Load Results" to reopen a previous analysis without recomputing the clustering.
 
 ## Citation
 
