@@ -101,43 +101,47 @@ class Data_Visualization:
         top_20_ids = np.argsort(cluster_sizes)[-min(20, len(cluster_sizes)):][::-1]
         top_20_ids = [int(cid) for cid in top_20_ids.tolist() if cluster_sizes[cid] > 0]
 
-        if len(cluster_sizes) < 100_000:
-            analysis_clusters = [
-                np.where(self.app.cluster_assignments == cid)[0].tolist()
-                for cid in range(len(cluster_sizes))
-                if cluster_sizes[cid] > 0
-            ]
-            analysis_assume_sorted = True
-            analysis_top = None
-        else:
-            analysis_clusters = [
-                np.where(self.app.cluster_assignments == cid)[0].tolist()
-                for cid in top_20_ids
-            ]
-            analysis_assume_sorted = True
-            analysis_top = None
+        if not top_20_ids:
+            messagebox.showinfo("Info", "No non-empty clusters available for summary plotting.")
+            return
+
+        # Always summarize only the selected top clusters.
+        analysis_clusters = [
+            np.where(self.app.cluster_assignments == cid)[0].tolist()
+            for cid in top_20_ids
+        ]
+        analysis_assume_sorted = True
+        analysis_top = None
 
         try:
             nbits = int(self.app.nbits_var.get())
         except ValueError:
             nbits = 1024
 
-        analysis = cluster_analysis(
-            analysis_clusters,
-            self.app.X,
-            smiles=self.app.data['SMILES'].tolist(),
-            n_features=nbits,
-            top=analysis_top,
-            assume_sorted=analysis_assume_sorted,
-            input_is_packed=True,
-            min_size=1,
-        )
+        try:
+            analysis = cluster_analysis(
+                analysis_clusters,
+                self.app.X,
+                smiles=self.app.data['SMILES'].tolist(),
+                n_features=nbits,
+                top=analysis_top,
+                assume_sorted=analysis_assume_sorted,
+                input_is_packed=True,
+                min_size=1,
+            )
+        except Exception as exc:
+            messagebox.showerror(
+                "Summary Plot Error",
+                "Failed to compute summary metrics. Some molecules may be invalid "
+                f"for scaffold extraction.\n\nDetails:\n{exc}",
+            )
+            return
 
         if analysis.df.empty:
             messagebox.showinfo("Info", "No clusters were available for the top-20 summary plot.")
             return
 
-        fig, _ = summary_plot(analysis, title="Top 20 clusters")
+        fig, _ = summary_plot(analysis, title=f"Top {len(top_20_ids)} clusters")
 
         window = tk.Toplevel(self.app.root)
         window.title("Top 20 Cluster Summary Plot")

@@ -50,10 +50,28 @@ def _process_smiles_batch(smiles_batch_with_idx, fp_kind, nbits):
     """
     batch_idx, smiles_list = smiles_batch_with_idx
 
+    # Normalize raw values to non-empty strings and keep index mapping.
+    normalized: list[tuple[int, str]] = []
+    for local_idx, smi in enumerate(smiles_list):
+        if smi is None:
+            continue
+        # Handle NaN without importing pandas in workers.
+        if isinstance(smi, float) and np.isnan(smi):
+            continue
+        smi_str = str(smi).strip()
+        if not smi_str or smi_str.lower() == 'nan':
+            continue
+        normalized.append((local_idx, smi_str))
+
+    if not normalized:
+        return np.empty((0, (nbits + 7) // 8), dtype=np.uint8), batch_idx, []
+
+    batch_smiles = [s for _, s in normalized]
+
     try:
         # One call for the whole batch — generator created once
         fps = fps_from_smiles(
-            smiles_list,
+            batch_smiles,
             kind=fp_kind,
             n_features=nbits,
             pack=True,
@@ -61,18 +79,39 @@ def _process_smiles_batch(smiles_batch_with_idx, fp_kind, nbits):
             sanitize='minimal',
         )
     except Exception:
-        fps = np.empty((0, (nbits + 7) // 8), dtype=np.uint8)
+        # Fallback: process one-by-one so a single malformed entry does not
+        # invalidate the whole batch.
+        valid_fps = []
+        valid_local_indices = []
+        for local_idx, smi in normalized:
+            try:
+                fp = fps_from_smiles(
+                    [smi],
+                    kind=fp_kind,
+                    n_features=nbits,
+                    pack=True,
+                    skip_invalid=True,
+                    sanitize='minimal',
+                )
+                if len(fp) > 0:
+                    valid_fps.append(fp[0])
+                    valid_local_indices.append(local_idx)
+            except Exception:
+                continue
+        if valid_fps:
+            return np.array(valid_fps, dtype=np.uint8), batch_idx, valid_local_indices
+        return np.empty((0, (nbits + 7) // 8), dtype=np.uint8), batch_idx, []
 
     # Because skip_invalid=True silently drops rows, we need to figure out
     # which local indices survived.  Re-validate quickly to build the mask.
     valid_local_indices = []
-    if len(fps) == len(smiles_list):
+    if len(fps) == len(batch_smiles):
         # All valid — fast path
-        valid_local_indices = list(range(len(smiles_list)))
+        valid_local_indices = [idx for idx, _ in normalized]
     elif len(fps) > 0:
         # Some were dropped — re-check individually (lightweight, no FP regen)
         from rdkit.Chem import MolFromSmiles
-        for local_idx, smi in enumerate(smiles_list):
+        for local_idx, smi in normalized:
             mol = MolFromSmiles(smi, sanitize=False)
             if mol is not None:
                 valid_local_indices.append(local_idx)
@@ -439,6 +478,7 @@ class Data_Processing:
                 text=f"Loaded: {os.path.basename(load_path)}")
             self.app.gui.save_btn.config(state="normal")
             self.app.gui.refresh_btn.config(state="normal")
+            self.app.gui.summary_btn.config(state="normal")
             self.app.display_data_info()
             self.app.show_overview()
             self.app.visualizer.display_clustering_results()
@@ -531,7 +571,12 @@ class Data_Processing:
                         self._set_progress(pct)
 
             if not fps_list:
-                raise ValueError("No valid fingerprints generated")
+                sample_vals = self.app.data['SMILES'].head(5).tolist()
+                raise ValueError(
+                    "No valid fingerprints generated. "
+                    "The SMILES column may contain malformed or non-string values. "
+                    f"Sample entries: {sample_vals}"
+                )
 
             self.app.X = np.vstack(fps_list)
             del fps_list
@@ -860,6 +905,7 @@ class Data_Processing:
         self.app.gui.process_btn.config(state="normal")
         self.app.gui.refresh_btn.config(state="normal")
         self.app.gui.save_btn.config(state="normal")
+        self.app.gui.summary_btn.config(state="normal")
         self.app.display_data_info()
         self.app.show_overview()
         self.app.visualizer.display_clustering_results()

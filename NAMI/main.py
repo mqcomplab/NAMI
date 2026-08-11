@@ -79,6 +79,9 @@ class BitBirchPCAGUI:
     
     def show_overview(self):
         return self.visualizer.show_overview()
+
+    def show_summary_plot(self):
+        return self.visualizer.show_summary_plot()
     
     def refresh_current_view(self):
         return self.gui.refresh_current_view()

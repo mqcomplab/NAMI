@@ -112,9 +112,10 @@ class GUIComponents:
         self.load_btn = ttk.Button(ctrl, text="Load Results", command=self.app.load_results)
         self.back_btn = ttk.Button(ctrl, text="← Back to Overview", command=self.app.show_overview, state="disabled")
         self.refresh_btn = ttk.Button(ctrl, text="Refresh View", command=self.refresh_current_view, state="disabled")
+        self.summary_btn = ttk.Button(ctrl, text="Top-20 Summary", command=self.app.show_summary_plot, state="disabled")
         self.reset_zoom_btn = ttk.Button(ctrl, text="Reset Zoom", command=self.reset_zoom, state="disabled")
 
-        for i, btn in enumerate([self.process_btn, self.save_btn, self.load_btn, self.back_btn, self.refresh_btn, self.reset_zoom_btn]):
+        for i, btn in enumerate([self.process_btn, self.save_btn, self.load_btn, self.back_btn, self.refresh_btn, self.summary_btn, self.reset_zoom_btn]):
             btn.grid(row=4, column=i, padx=(0, 10), pady=(5, 0))
         
         # Progress bar
