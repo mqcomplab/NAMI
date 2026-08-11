@@ -1,5 +1,6 @@
 # N-Ary Mapping Interface (NAMI)
 
+![TOC-1](TOC-1.png)
 A powerful GUI application for molecular clustering and visualization using BitBirch clustering algorithm with PCA dimensionality reduction. Provides a tool for chemists to visualize and analyze large chemical libraries.
 
 ## Features
