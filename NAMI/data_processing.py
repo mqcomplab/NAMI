@@ -426,7 +426,11 @@ class Data_Processing:
             smiles_list = self.app.data['SMILES'].tolist()
             # Respect SLURM/cgroup CPU allocation instead of using all node cores
             import os
-            n_cores = max(1, len(os.sched_getaffinity(0)) - 1)  # Leave one core free
+            try:
+                available_cores = len(os.sched_getaffinity(0))
+            except AttributeError:
+                available_cores = os.cpu_count() or 1
+            n_cores = max(1, available_cores - 1)  # Leave one core free
             
             # Map radius to BBlean fingerprint kind
             if radius == 2:
@@ -566,7 +570,11 @@ class Data_Processing:
                         cluster_to_indices = _build_cluster_to_indices(self.app.cluster_assignments)
                         
                         # Parallel centroid computation
-                        n_cores = max(1, len(os.sched_getaffinity(0)) - 1)
+                        try:
+                            available_cores = len(os.sched_getaffinity(0))
+                        except AttributeError:
+                            available_cores = os.cpu_count() or 1
+                        n_cores = max(1, available_cores - 1)
                         batch_size = max(10, len(non_singleton_cluster_ids) // (n_cores * 20))  # 20 batches per core for load balancing
                         
                         # Split cluster IDs into batches
@@ -625,7 +633,11 @@ class Data_Processing:
                             cluster_to_indices = _build_cluster_to_indices(self.app.cluster_assignments)
                             
                             # Parallel centroid computation (fallback)
-                            n_cores = max(1, len(os.sched_getaffinity(0)) - 1)
+                            try:
+                                available_cores = len(os.sched_getaffinity(0))
+                            except AttributeError:
+                                available_cores = os.cpu_count() or 1
+                            n_cores = max(1, available_cores - 1)
                             batch_size = max(10, len(non_singleton_cluster_ids) // (n_cores * 20))
                             
                             # Split cluster IDs into batches
@@ -713,7 +725,11 @@ class Data_Processing:
                         cluster_to_indices = _build_cluster_to_indices(self.app.cluster_assignments)
                         
                         # Parallel centroid computation (all clusters)
-                        n_cores = max(1, len(os.sched_getaffinity(0)) - 1)
+                        try:
+                            available_cores = len(os.sched_getaffinity(0))
+                        except AttributeError:
+                            available_cores = os.cpu_count() or 1
+                        n_cores = max(1, available_cores - 1)
                         batch_size = max(10, num_clusters // (n_cores * 20))
                         
                         # Split cluster IDs into batches
@@ -1069,7 +1085,11 @@ class Data_Processing:
                         f"Index map ready ({len(cluster_to_indices):,} clusters mapped)\n"))
                     
                     # PARALLEL: Compute centroids directly from fingerprints using multiple cores
-                    n_cores = max(1, len(os.sched_getaffinity(0)) - 1)
+                    try:
+                        available_cores = len(os.sched_getaffinity(0))
+                    except AttributeError:
+                        available_cores = os.cpu_count() or 1
+                    n_cores = max(1, available_cores - 1)
                     batch_size = max(10, num_clusters // (n_cores * 20))
                     
                     # Split cluster IDs into batches
