@@ -81,7 +81,6 @@ python NAMI/main.py
 
 ## Citation
 
-Paper: 
-
+Paper: Akash Surendran, Krisztina Zsigmond, Lexin Chen, Ramón Alain Miranda-Quintana; Efficient visualization of chemical space. Chem. Sci. 2026; https://doi.org/10.1039/d6sc03716j
 
 
