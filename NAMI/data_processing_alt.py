@@ -162,7 +162,10 @@ def _compute_centroids_for_ids(cluster_ids_batch):
 
 def _available_cores():
     """Number of CPU cores available to this process (respects cgroups/SLURM)."""
-    return max(1, len(os.sched_getaffinity(0)))
+    try:
+        return max(1, len(os.sched_getaffinity(0)))
+    except AttributeError:
+        return max(1, os.cpu_count() or 1)
 
 
 def _build_cluster_to_indices(assignments):
